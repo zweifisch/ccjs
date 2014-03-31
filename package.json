@@ -1,0 +1,17 @@
+{
+  "name": "ccjs",
+  "version": "0.0.0",
+  "description": "client side common js                                                                                                                                                 ",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {
+    "connect": "^2.14.3",
+    "jquery": "^2.1.0",
+    "lodash": "^2.4.1"
+  }
+}
