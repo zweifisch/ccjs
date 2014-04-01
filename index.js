@@ -41,7 +41,7 @@ var rewrite = function(name, root) {
     if (id.substr(0,2) !== '..' && id.substr(0,1) !== '/' && id.substr(0,2) !== './') {
         id = './' + id;
     }
-    return "require.modules['"+id+"'] = function(require, exports, module) {\n"
+    return "require.modules['"+id+"'] = function(require, exports, module, process) {\n"
         + content(name)
         + "}";
 };
@@ -92,19 +92,32 @@ var clientJS = function() {
     var cache = {};
     var modules = {};
     var map = {};
+    var process = {
+        env:{}
+    };
+
+    var f = function(){};
+    var shims = {
+        tty: {
+            isatty: f
+        }
+    };
     
     var getRequire = function(pwd) {
         return function(name) {
             var path = resolve(name, pwd);
-            if(!(path in cache)) {
+            if (!(path in cache)) {
                 var module = {exports:{}};
-                if(!(path in modules)) {
+                if (!(path in modules)) {
+                    if (name in shims) {
+                        return shims[name];
+                    }
                     console.log('modules', Object.keys(modules));
                     console.log('map', map);
                     console.log('name', name);
                     console.log('path', path);
                 }
-                modules[path](getRequire(dirname(path)), module.exports, module);
+                modules[path](getRequire(dirname(path)), module.exports, module, process);
                 cache[path] = module.exports;
             }
             return cache[path];
@@ -157,12 +170,20 @@ var clientJS = function() {
     return require;
 };
 
+var getModulename = function(p) {
+    var lastIndex = p.lastIndexOf('node_modules/');
+    if (lastIndex !=- -1) {
+        p = p.substr(lastIndex + 13);
+        return p.substr(0, p.indexOf('/'));
+    }
+};
+
 var buildIndex = function(filenames, root) {
     var ret = {};
     for(var i=0; i<filenames.length; i++) {
-        var matched = filenames[i].match('node_modules\/([^/]+)');
-        if (matched && !ret[matched[1]]) {
-            ret[matched[1]] = getIdFromPath(filenames[i], root);
+        var modulename = getModulename(filenames[i]);
+        if (modulename) {
+            ret[modulename] = getIdFromPath(filenames[i], root);
         }
     }
     return ret;
