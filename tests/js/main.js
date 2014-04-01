@@ -21,6 +21,8 @@ describe('require', function() {
         
         m2 = require('./m2');
         m2.module.should.equal('m2');
+        
+        // m3 = require('./m3');
     });
 
 });

@@ -47,13 +47,13 @@ var rewrite = function(name, root) {
 };
 
 var deps = function(script) {
-    var result = script.match(/require\s*\(\s*['"]([a-zA-Z0-9/._-]+)['"]\s*\)/g);
-	if (result && result.length) {
-		return result.map(function(statement) {
-			return statement.match(/['"]([a-zA-Z0-9./_-]+)['"]/)[1];
-        });
-    }
-    return [];
+    return script.split(/\r?\n/).map(function(line) {
+        return line.match(/^[^/*]*require\s*\(\s*['"]([a-zA-Z0-9/._-]+)['"]\s*\)/);
+    }).filter(function(x) {
+        return !! x;
+    }).map(function(x) {
+        return x[1];
+    });
 };
 
 var dump = function(filename, root) {
