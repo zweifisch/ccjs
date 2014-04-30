@@ -25,11 +25,23 @@ see `tests/server.js`
 var path = require('path');
 var ccjs = require('ccjs').middleware;
 
-app.use(ccjs(path.join(__dirname, '/public/js')));
+app.use(ccjs({root:path.join(__dirname, '/public/js')}));
 ```
 
 ```html
 <script src="main.js?commonjs=1"></script>
+```
+
+### coffeescript
+
+```sh
+npm install --save coffee-script
+```
+
+```coffee
+app.use ccjs
+	root: path.join __dirname, '/public/js'
+	coffee: on
 ```
 
 ### grunt/gulp plugin

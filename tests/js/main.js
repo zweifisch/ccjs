@@ -31,6 +31,11 @@ describe('require', function() {
         page = require('page');
         (typeof page).should.equal('function');
     });
+    
+    it('should load coffee scripts', function() {
+        m4 = require('./m4');
+        m4().should.equal('coffee please!');
+    });
 
 });
 

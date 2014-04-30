@@ -1,21 +1,12 @@
 var fs = require('fs');
 var path = require('path');
+var url = require('url');
 
 var stripExt = function(filename) {
     return filename.substr(0, filename.length - path.extname(filename).length);
 };
 
-var reload = function(name) {
-    filename = require.resolve(name);
-    delete require.cache[filename];
-    module.children = module.children.filter(function(m) {
-        return m.filename !== filename;
-    });
-    return require(name);
-};
-
-var content = function(name) {
-    filename = require.resolve(name);
+var readFileSync = function(filename) {
     return fs.readFileSync(filename, {encoding:'utf8'});
 };
 
@@ -36,17 +27,17 @@ var getFilenames = function(m) {
     return ret;
 };
 
-var rewrite = function(name, root) {
-    var id = getIdFromPath(name, root);
+var modulize = function(script, filename, root) {
+    var id = getIdFromPath(filename, root);
     if (id.substr(0,2) !== '..' && id.substr(0,1) !== '/' && id.substr(0,2) !== './') {
         id = './' + id;
     }
     return "require.modules['"+id+"'] = function(require, exports, module, process) {\n"
-        + content(name)
+        + script
         + "}";
 };
 
-var deps = function(script) {
+var scanForRequires = function(script) {
     return script.split(/\r?\n/).map(function(line) {
         return line.match(/^[^/*]*require\s*\(\s*['"]([a-zA-Z0-9/._-]+)['"]\s*\)/);
     }).filter(function(x) {
@@ -56,118 +47,76 @@ var deps = function(script) {
     });
 };
 
-var dump = function(filename, root) {
-    root = root || '.';
-    filename = path.join(root, filename);
-    filename = stripExt(filename);
-    var directDeps = deps(content(filename));
+var object = function(keys, values) {
+    var len = keys.length;
+    var ret = {};
+    for (var i=0; i<len; i++) {
+        ret[keys[i]] = values[i];
+    }
+    return ret;
+};
 
-    directDeps = directDeps.map(function(m) {
-        return m[0] === '.' ? path.join(root, m) : m;
-    });
+var deps = function(script, filename, compilers) {
+
+    var required = {};
+    var nodeModules = {};
+
+    var getDeps = function(requires, parent) {
+        for (i=0; i<requires.length; i++) {
+            var id = requires[i];
+            if (id[0] === '.') {
+                id = path.join(path.dirname(parent), id);
+                if (!(id in required)) {
+                    if (fs.existsSync(id + '.js')) {
+                        required[id] = readFileSync(id + '.js');
+                    } else {
+                        for (var ext in compilers) {
+                            if (fs.existsSync(id + '.' + ext)) {
+                                required[id] = compilers[ext](readFileSync(id + '.' + ext));
+                            }
+                        }
+                    }
+                    if (id in required) {
+                        getDeps(scanForRequires(required[id]), id);
+                    } else {
+                        throw new Exception("module: " + id + " not found");
+                    }
+                }
+            } else {
+                nodeModules[id] = true;
+            }
+        }
+    };
+
+    getDeps(scanForRequires(script), filename);
+
+    var lookup = {};
     
-    directDeps.forEach(function(m) {
-        require(m);
-    });
+    Object.keys(nodeModules).forEach(require);
 
-    lookup = {};
-    length = module.children.length;
-    for (i=0; i<length; i++) {
+    var length = module.children.length;
+    for (var i=0; i<length; i++) {
         lookup[module.children[i].filename] = module.children[i];
     }
     
-    var modules = directDeps.map(function(m) {
+    var modules = Object.keys(nodeModules).map(function(m) {
         return lookup[require.resolve(m)];
     }).filter(function(m) {
         return !!m;
     });
+
+    var filenames = [].concat.apply([], modules.map(getFilenames));
+    for (i=0; i<filenames.length; i++) {
+        required[filenames[i]] = readFileSync(filenames[i]);
+    }
     
-    filenames = [].concat.apply([], modules.map(getFilenames));
-    filenames.unshift(filename);
-    return browserify(filenames, root);
+    return required;
 };
 
-var clientJS = function() {
-
-    var cache = {};
-    var modules = {};
-    var map = {};
-    var process = {
-        env:{}
-    };
-
-    var f = function(){};
-    var shims = {
-        tty: {
-            isatty: f
-        }
-    };
-    
-    var getRequire = function(pwd) {
-        return function(name) {
-            var path = resolve(name, pwd);
-            if (!(path in cache)) {
-                var module = {exports:{}};
-                if (!(path in modules)) {
-                    if (name in shims) {
-                        return shims[name];
-                    }
-                    console.log('modules', Object.keys(modules));
-                    console.log('map', map);
-                    console.log('name', name);
-                    console.log('path', path);
-                }
-                modules[path](getRequire(dirname(path)), module.exports, module, process);
-                cache[path] = module.exports;
-            }
-            return cache[path];
-        };
-    };
-
-    var resolve = function(name, pwd) {
-        if (name[0] === '.') {
-            return join(pwd, name);
-        } else {
-            return map[name];
-        }
-    };
-    
-    var dirname = function(filename) {
-        splited = filename.split('/');
-        if (splited[splited.length - 1] === '') {
-            return filename;
-        } else {
-            splited.pop();
-            return splited.join('/');
-        }
-    };
-
-    var self = function(x) {return x;};
-
-    var join = function(p1, p2) {
-        var absolute = p1.substr(0,1) === '/';
-        var directory = p2.substr(p2.length - 1) === '/';
-        p1 = p1.split('/').filter(self);
-        p2 = p2.split('/').filter(self);
-        while (p1.length && p2.length) {
-            if (p2[0] === '.') {
-                p2.shift();
-            } else if (p2[0] === '..') {
-                p2.shift();
-                p1.pop();
-            } else {
-                break;
-            }
-        }
-        return (absolute ? '/' : '') + p1.concat(p2).join('/') + (directory ? '/' : '');
-    };
-    
-    require = getRequire('');
-    require.modules = modules;
-    require.setMap = function(m) {
-        map = m;
-    };
-    return require;
+var processFile = function(js, filename, root, compilers) {
+    var dependencies = deps(js, filename, compilers);
+    dependencies[filename] = js;
+    return browserify(dependencies, filename, root);
 };
 
 var getModulename = function(p) {
@@ -189,36 +138,59 @@ var buildIndex = function(filenames, root) {
     return ret;
 };
 
-var browserify = function(filenames, root) {
+var browserify = function(modules, entry, root) {
+    var filenames = Object.keys(modules);
     var map = buildIndex(filenames, root);
     return [";(function() {",
             "var require = (",
-            clientJS,
+            require('./client'),
             ")();",
             "require.setMap(" + JSON.stringify(map) + ");",
-            filenames.map(function(filename){return rewrite(filename, root);}).join("\n"),
-            "require('./"+getIdFromPath(filenames[0], root)+"');",
+            filenames.map(function(filename) {
+                return modulize(modules[filename], filename, root);
+            }).join("\n"),
+            "require('./"+getIdFromPath(entry, root)+"');",
             "})();"].join("\n");
 };
 
-var middleware = function(root) {
-    root = root || '.';
+var middleware = function(opts) {
+    root = opts.root || '.';
+    var compilers = {};
+    if (opts.coffee) {
+        var coffee = require('coffee-script');
+        compilers.coffee = function(js) {
+            return coffee.compile(js, {bare: true});
+        };
+    }
     return function(req, res, next) {
-        var p = req.url;
-        if (p.indexOf('?')) {
-            p = p.substr(0, p.indexOf('?'));
-        }
-        if (req.method === 'GET' && path.extname(p) === '.js' && req.query.commonjs) {
+        var pathname = url.parse(req.url).pathname;
+        if (req.method === 'GET' && path.extname(pathname) === '.js' && req.query.commonjs) {
+            
+            var realpath = path.join(root, pathname.substr(1));
+
+            if (path.relative(root, realpath).substr(0,2) === '..') {
+                return next();
+            }
+
+            realpath = stripExt(realpath);
+            
+            if (opts.coffee && fs.existsSync(realpath + '.coffee')) {
+                js = readFileSync(realpath + '.coffee');
+                js = compilers.coffee(js);
+            } else {
+                js = readFileSync(realpath + '.js' , {encoding: 'utf8'});
+            }
+
             res.writeHead(200, {
                 'Content-Type': 'text/javascript'
             });
-            res.write(dump(req.url.substr(1), root));
-            return res.end();
+            res.write(processFile(js, realpath, root, compilers));
+            res.end();
         } else {
             next();
         }
     };
 };
 
-exports.dump = dump;
+exports.processFile = processFile;
 exports.middleware = middleware;

@@ -6,7 +6,10 @@ var app = connect();
 
 app.use(connect.logger())
     .use(connect.query())
-    .use(ccjs(path.join(__dirname, 'js')))
+    .use(ccjs({
+        root: path.join(__dirname, 'js'),
+        coffee: true
+    }))
     .use(connect.static(__dirname));
 
 port = process.env.PORT || 8000;
