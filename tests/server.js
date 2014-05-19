@@ -2,6 +2,8 @@ var ccjs = require('ccjs').middleware;
 var connect = require('connect');
 var path = require('path');
 
+require('too-late');
+
 var app = connect();
 
 app.use(connect.logger())

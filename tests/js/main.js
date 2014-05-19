@@ -37,6 +37,11 @@ describe('require', function() {
         m4().should.equal('coffee please!');
     });
 
+    it('should load modules already required server side', function() {
+        tooLate = require('too-late');
+        (typeof tooLate).should.equal('function');
+    })
+
 });
 
 mocha.run();

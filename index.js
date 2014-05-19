@@ -98,6 +98,13 @@ var deps = function(script, filename, compilers) {
     for (var i=0; i<length; i++) {
         lookup[module.children[i].filename] = module.children[i];
     }
+
+    if (module.parent) {
+        var ms = module.parent.children;
+        for (i=0; i<ms.length; i++) {
+            lookup[ms[i].filename] = ms[i];
+        }
+    }
     
     var modules = Object.keys(nodeModules).map(function(m) {
         return lookup[require.resolve(m)];
