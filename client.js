@@ -1,4 +1,3 @@
-
 module.exports = function() {
 
     var cache = {};
@@ -14,7 +13,7 @@ module.exports = function() {
             isatty: f
         }
     };
-    
+
     var getRequire = function(pwd) {
         return function(name) {
             var path = resolve(name, pwd);
@@ -24,10 +23,12 @@ module.exports = function() {
                     if (name in shims) {
                         return shims[name];
                     }
-                    console.log('modules', Object.keys(modules));
-                    console.log('map', map);
-                    console.log('name', name);
-                    console.log('path', path);
+                    throw new Error("can't load " + name + ' from ' + pwd, {
+                        modules: Object.keys(modules),
+                        map: map,
+                        name: name,
+                        path: path
+                    });
                 }
                 modules[path](getRequire(dirname(path)), module.exports, module, process);
                 cache[path] = module.exports;
@@ -43,7 +44,7 @@ module.exports = function() {
             return map[name];
         }
     };
-    
+
     var dirname = function(filename) {
         splited = filename.split('/');
         if (splited[splited.length - 1] === '') {

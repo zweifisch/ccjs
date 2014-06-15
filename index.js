@@ -56,6 +56,26 @@ var object = function(keys, values) {
     return ret;
 };
 
+var getAllLoadedModule = function() {
+    var lookup = {};
+    var root = module;
+
+    while (root.parent) root = root.parent;
+
+    var getModuleFiles = function(m) {
+        var length = m.children.length;
+        for (var i=0; i<length; i++) {
+            lookup[m.children[i].filename] = m.children[i];
+            if (m.children[i].children) {
+                getModuleFiles(m.children[i]);
+            }
+        }
+    };
+    getModuleFiles(root);
+
+    return lookup;
+};
+
 var deps = function(script, filename, compilers) {
 
     var required = {};
@@ -90,22 +110,10 @@ var deps = function(script, filename, compilers) {
 
     getDeps(scanForRequires(script), filename);
 
-    var lookup = {};
-    
     Object.keys(nodeModules).forEach(require);
 
-    var length = module.children.length;
-    for (var i=0; i<length; i++) {
-        lookup[module.children[i].filename] = module.children[i];
-    }
+    lookup = getAllLoadedModule();
 
-    if (module.parent) {
-        var ms = module.parent.children;
-        for (i=0; i<ms.length; i++) {
-            lookup[ms[i].filename] = ms[i];
-        }
-    }
-    
     var modules = Object.keys(nodeModules).map(function(m) {
         return lookup[require.resolve(m)];
     }).filter(function(m) {
@@ -116,7 +124,7 @@ var deps = function(script, filename, compilers) {
     for (i=0; i<filenames.length; i++) {
         required[filenames[i]] = readFileSync(filenames[i]);
     }
-    
+
     return required;
 };
 

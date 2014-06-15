@@ -1,6 +1,6 @@
 {
   "name": "ccjs",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "client side common js                                                                                                                                                 ",
   "main": "index.js",
   "scripts": {
