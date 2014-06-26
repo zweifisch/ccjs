@@ -99,7 +99,7 @@ var deps = function(script, filename, compilers) {
                     if (id in required) {
                         getDeps(scanForRequires(required[id]), id);
                     } else {
-                        throw new Exception("module: " + id + " not found");
+                        throw new Error("module: " + id + " not found");
                     }
                 }
             } else {
