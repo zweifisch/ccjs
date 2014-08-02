@@ -4,11 +4,14 @@ client-side common js
 
 ## how does it work
 
-* you need to bring up an ccjs server or use the middlare(described
-below) inside your connect based application(e.g. express)
-* the browser make a request to the server asking for a js file
-* the original js file will be read from disk
-* all dependencies of that file get bundled and send to browser
+* it will be used as a middlare(described below) inside your connect based
+    application(e.g. express)
+* when the browser make a request to the server asking for a js file, the
+    original js file will be read from disk, and all dependencies of that file
+    get bundled and sent to browser
+* for performance consideration, the js file need to be pre-bundled for
+    deployment, this can be done using
+    [grunt-ccjs](https://github.com/zweifisch/grunt-ccjs)
 
 ## limitations
 
@@ -44,6 +47,6 @@ app.use ccjs
 	coffee: on
 ```
 
-### grunt/gulp plugin
+### grunt plugin
 
-TBD
+* [grunt-ccjs](https://github.com/zweifisch/grunt-ccjs)
