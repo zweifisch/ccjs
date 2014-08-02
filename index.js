@@ -37,14 +37,18 @@ var modulize = function(script, filename, root) {
         + "}";
 };
 
+var stripComments = function(source) {
+    return source.replace(/(?:\/\*(?:[\s\S]*?)\*\/)|(?:([\s;])+\/\/(?:.*)$)/gm, '$1');
+};
+
 var scanForRequires = function(script) {
-    return script.split(/\r?\n/).map(function(line) {
-        return line.match(/^[^/*]*require\s*\(\s*['"]([a-zA-Z0-9/._-]+)['"]\s*\)/);
-    }).filter(function(x) {
-        return !! x;
-    }).map(function(x) {
-        return x[1];
-    });
+    var matched = stripComments(script).match(/require\s*\(\s*['"][^)]+['"]\s*\)/g);
+    if (matched) {
+        return ret = matched.map(function(x) {
+            return x.match(/require\s*\(\s*['"](.*)['"]\s*\)/)[1];
+        });
+    }
+    return [];
 };
 
 var object = function(keys, values) {
