@@ -32,7 +32,7 @@ var modulize = function(script, filename, root) {
     if (id.substr(0,2) !== '..' && id.substr(0,1) !== '/' && id.substr(0,2) !== './') {
         id = './' + id;
     }
-    return "require.modules['"+id+"'] = function(require, exports, module, process) {\n"
+    return "require.modules['"+id+"'] = function(require, exports, module) {\n"
         + script
         + "}";
 };
@@ -204,6 +204,7 @@ var middleware = function(opts) {
         } else {
             next();
         }
+        return null;
     };
 };
 

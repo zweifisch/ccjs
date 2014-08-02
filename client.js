@@ -3,16 +3,8 @@ module.exports = function() {
     var cache = {};
     var modules = {};
     var map = {};
-    var process = {
-        env:{}
-    };
 
     var f = function(){};
-    var shims = {
-        tty: {
-            isatty: f
-        }
-    };
 
     var getRequire = function(pwd) {
         return function(name) {
@@ -20,9 +12,6 @@ module.exports = function() {
             if (!(path in cache)) {
                 var module = {exports:{}};
                 if (!(path in modules)) {
-                    if (name in shims) {
-                        return shims[name];
-                    }
                     throw new Error("can't load " + name + ' from ' + pwd, {
                         modules: Object.keys(modules),
                         map: map,
@@ -30,7 +19,7 @@ module.exports = function() {
                         path: path
                     });
                 }
-                modules[path](getRequire(dirname(path)), module.exports, module, process);
+                modules[path](getRequire(dirname(path)), module.exports, module);
                 cache[path] = module.exports;
             }
             return cache[path];

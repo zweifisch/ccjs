@@ -25,9 +25,6 @@ describe('require', function() {
     });
 
     it('should load component', function() {
-        jsonp = require('jsonp');
-        (typeof jsonp).should.equal('function');
-        
         page = require('page');
         (typeof page).should.equal('function');
     });
@@ -40,7 +37,7 @@ describe('require', function() {
     it('should load modules already required server side', function() {
         tooLate = require('too-late');
         (typeof tooLate).should.equal('function');
-    })
+    });
 
 });
 
