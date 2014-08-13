@@ -8,7 +8,9 @@
   },
   "author": "zf",
   "license": "MIT",
-  "dependencies": {},
+  "dependencies": {
+    "debug": "^1.0.4"
+  },
   "devDependencies": {
     "coffee-script": "^1.7.1",
     "connect": "^2.14.3",

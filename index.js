@@ -1,6 +1,13 @@
 var fs = require('fs');
 var path = require('path');
 var url = require('url');
+var debug = require('debug');
+
+var log = {
+    info: debug('ccjs:info'),
+    debug: debug('ccjs:debug')
+};
+
 
 var stripExt = function(filename) {
     return filename.substr(0, filename.length - path.extname(filename).length);
@@ -9,6 +16,20 @@ var stripExt = function(filename) {
 var readFileSync = function(filename) {
     return fs.readFileSync(filename, {encoding:'utf8'});
 };
+
+var memorize = function(fn) {
+    var memorized = {};
+    return function() {
+        var key = Array.prototype.join.call(arguments, ',');
+        log.debug('memorize ' + key);
+        if (!(key in memorized)) {
+            memorized[key] = fn.apply(null, arguments);
+        }
+        return memorized[key];
+    };
+};
+
+var readFileSyncCached = memorize(readFileSync);
 
 var getIdFromPath = function(p, root) {
     return stripExt(path.relative(root, p));
@@ -51,15 +72,6 @@ var scanForRequires = function(script) {
     return [];
 };
 
-var object = function(keys, values) {
-    var len = keys.length;
-    var ret = {};
-    for (var i=0; i<len; i++) {
-        ret[keys[i]] = values[i];
-    }
-    return ret;
-};
-
 var getAllLoadedModule = function() {
     var lookup = {};
     var root = module;
@@ -80,62 +92,85 @@ var getAllLoadedModule = function() {
     return lookup;
 };
 
-var deps = function(script, filename, compilers) {
-
-    var required = {};
-    var nodeModules = {};
-
-    var getDeps = function(requires, parent) {
-        for (i=0; i<requires.length; i++) {
-            var id = requires[i];
-            if (id[0] === '.') {
-                id = path.join(path.dirname(parent), id);
-                if (!(id in required)) {
-                    if (fs.existsSync(id + '.js')) {
-                        required[id] = readFileSync(id + '.js');
-                    } else {
-                        for (var ext in compilers) {
-                            if (fs.existsSync(id + '.' + ext)) {
-                                required[id] = compilers[ext](readFileSync(id + '.' + ext));
-                            }
-                        }
-                    }
-                    if (id in required) {
-                        getDeps(scanForRequires(required[id]), id);
-                    } else {
-                        throw new Error("module: " + id + " not found");
-                    }
-                }
-            } else {
-                nodeModules[id] = true;
+var depsCache = {};
+var getScriptDependencies = function(filename, compilers) {
+    var ext = 'js';
+    var mtime = null;
+    try {
+        mtime = +fs.statSync(filename + '.' + ext).mtime;
+    } catch(e) {
+        if (compilers) {
+            for(ext in compilers) {
+                try {
+                    mtime = +fs.statSync(filename + '.' + ext).mtime;
+                } catch(e) {}
             }
         }
-    };
-
-    getDeps(scanForRequires(script), filename);
-
-    Object.keys(nodeModules).forEach(require);
-
-    lookup = getAllLoadedModule();
-
-    var modules = Object.keys(nodeModules).map(function(m) {
-        return lookup[require.resolve(m)];
-    }).filter(function(m) {
-        return !!m;
-    });
-
-    var filenames = [].concat.apply([], modules.map(getFilenames));
-    for (i=0; i<filenames.length; i++) {
-        required[filenames[i]] = readFileSync(filenames[i]);
     }
-
-    return required;
+    if (!mtime) {
+        throw new Error('failed to get mtime of ' + filename);
+    }
+    if (!(filename in depsCache && depsCache[filename].mtime == mtime)) {
+        depsCache[filename] = _getScriptDependencies(filename, ext, compilers ? compilers[ext] : null);
+        depsCache[filename].mtime = mtime;
+    }
+    return depsCache[filename];
 };
 
-var processFile = function(js, filename, root, compilers) {
-    var dependencies = deps(js, filename, compilers);
-    dependencies[filename] = js;
-    return browserify(dependencies, filename, root);
+var _getScriptDependencies = function(filename, ext, compiler) {
+    log.debug('load ' + filename + ' as ' + ext);
+    var content = readFileSync(filename + '.' + ext);
+    if (compiler) content = compiler(content);
+    return {
+        content: content,
+        requires: scanForRequires(content)
+    };
+};
+
+var deps = function(filename, compilers) {
+    var modules = {};
+    var nodeModules = {};
+
+    var processModule = function(filename, parent) {
+        log.debug(filename + ' from ' + parent);
+        var _module = getScriptDependencies(filename, compilers);
+        modules[filename] = _module;
+        _module.requires.filter(function(r){
+            return !(r in modules);
+        }).forEach(function(r){
+            if (r[0] === '.') {
+                processModule(path.join(path.dirname(filename), r), filename);
+            } else {
+                nodeModules[r] = true;
+            }
+        });
+    };
+
+    processModule(filename);
+    
+    nodeModules = Object.keys(nodeModules);
+    
+    nodeModules.forEach(require);
+    var lookup = getAllLoadedModule();
+    nodeModules = nodeModules.map(function(modulename) {
+        return lookup[require.resolve(modulename)];
+    }).filter(function(x) {
+        return !!x;
+    });
+    
+    var filenames = [].concat.apply([], nodeModules.map(getFilenames));
+    log.debug('npm modules ', filenames);
+    filenames.forEach(function(filename) {
+        modules[filename] = {
+            content: readFileSyncCached(filename)
+        };
+    });
+    return modules;
+};
+
+var bundle = function(realpath, root, compilers) {
+    var dependencies = deps(realpath, compilers);
+    return browserify(dependencies, realpath, root);
 };
 
 var getModulename = function(p) {
@@ -144,6 +179,7 @@ var getModulename = function(p) {
         p = p.substr(lastIndex + 13);
         return p.substr(0, p.indexOf('/'));
     }
+    return null;
 };
 
 var buildIndex = function(filenames, root) {
@@ -166,7 +202,7 @@ var browserify = function(modules, entry, root) {
             ")();",
             "require.setMap(" + JSON.stringify(map) + ");",
             filenames.map(function(filename) {
-                return modulize(modules[filename], filename, root);
+                return modulize(modules[filename].content, filename, root);
             }).join("\n"),
             "require('./"+getIdFromPath(entry, root)+"');",
             "})();"].join("\n");
@@ -184,26 +220,19 @@ var middleware = function(opts) {
     return function(req, res, next) {
         var pathname = url.parse(req.url).pathname;
         if (req.method === 'GET' && path.extname(pathname) === '.js' && req.query.commonjs) {
-            
             var realpath = path.join(root, pathname.substr(1));
-
             if (path.relative(root, realpath).substr(0,2) === '..') {
                 return next();
             }
-
             realpath = stripExt(realpath);
-            
-            if (opts.coffee && fs.existsSync(realpath + '.coffee')) {
-                js = readFileSync(realpath + '.coffee');
-                js = compilers.coffee(js);
-            } else {
-                js = readFileSync(realpath + '.js' , {encoding: 'utf8'});
+            try {
+                bundled = bundle(realpath, root, compilers);
+                res.writeHead(200, {'Content-Type': 'text/javascript'});
+                res.write(bundled);
+            } catch(e) {
+                res.writeHead(200, {'Content-Type': 'text/javascript'});
+                res.write('console.error("' + e.toString().replace(/"/, '\"') + '")');
             }
-
-            res.writeHead(200, {
-                'Content-Type': 'text/javascript'
-            });
-            res.write(processFile(js, realpath, root, compilers));
             res.end();
         } else {
             next();
@@ -212,5 +241,5 @@ var middleware = function(opts) {
     };
 };
 
-exports.processFile = processFile;
+exports.bundle = bundle;
 exports.middleware = middleware;
