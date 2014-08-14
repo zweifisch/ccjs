@@ -9,6 +9,7 @@
   "author": "zf",
   "license": "MIT",
   "dependencies": {
+    "chokidar": "^0.8.3",
     "debug": "^1.0.4"
   },
   "devDependencies": {

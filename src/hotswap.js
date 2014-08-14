@@ -1,8 +1,7 @@
-var fs = require('fs');
 var url = require('url');
 var path = require('path');
 var debug  = require('debug');
-var EventEmitter = require('events').EventEmitter;
+var chokidar = require('chokidar');
 
 var utils = require('./utils');
 var bundler = require('./bundler');
@@ -16,29 +15,25 @@ var log = {
 
 module.exports = function(opts) {
 
-    var emitter = new EventEmitter();
-    fs.watch(opts.root, function(event, filename) {
-        if (event === 'change') {
-            filename = utils.stripExt(filename);
-            log.info(filename + ' changed');
-            emitter.emit('changed', filename);
-        }
-    });
-    
+    var watcher = chokidar.watch(opts.root, {ignored: /[\/\\]\./});
+
     log.info('ccjs start watch in ' + opts.root);
     var compilers = getCompilers(opts);
     
     return function(req, res, next) {
-        var pathname = url.parse(req.url).pathname;
+        var pathname = url.parse(req.originalUrl || req.url).pathname;
         if (req.method === 'GET' && path.extname(pathname) === '.js' && req.query.commonjs) {
             log.debug(pathname + ' seed');
-            res.write(["(" , require('./hotswap-client'), ")();"].join('\n'));
+            res.write(require('./hotswap-client')(pathname));
         } else if (req.method === 'GET' && path.extname(pathname) === '.js' && req.query.event) {
             log.debug(pathname + ' subscribed');
             res.setHeader('Content-Type', 'text/event-stream');
             res.setHeader('Cache-Control', 'no-cache');
-            emitter.on('changed', function(filename) {
-                var bundled = bundler.bundleModule(path.join(opts.root, filename), opts.root, compilers);
+            
+            watcher.on('change', function(filename) {
+                filename = utils.stripExt(filename);
+                log.info(filename + ' changed');
+                var bundled = bundler.bundleModule(filename, opts.root, compilers);
                 res.write('event: swap\n');
                 res.write('data: ' + bundled.split('\n').join(''));
                 res.write('\n\n');

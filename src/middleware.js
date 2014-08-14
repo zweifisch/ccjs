@@ -1,9 +1,14 @@
 var path = require('path');
 var url = require('url');
+var debug = require('debug');
 
 var bundler = require('./bundler');
 var utils = require('./utils');
 var getCompilers = require('./compilers');
+
+var log = {
+    error: debug('ccjs:middleware:error')
+};
 
 
 var middleware = function(opts) {
@@ -17,12 +22,15 @@ var middleware = function(opts) {
                 return next();
             }
             realpath = utils.stripExt(realpath);
-            res.setHeader('Content-Type', 'text/javascript');
+            // res.setHeader('Content-Type', 'text/javascript');
             try {
                 var bundled = bundler.bundle(realpath, root, compilers);
                 res.write(bundled);
+                return res.end();
             } catch(e) {
+                log.error(e);
                 res.write(';console.error("' + e.toString().replace(/"/, '\"') + '");');
+                return res.end();
             }
         }
         return next();
