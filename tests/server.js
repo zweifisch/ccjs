@@ -1,18 +1,22 @@
-var ccjs = require('ccjs').middleware;
-var connect = require('connect');
 var path = require('path');
+var express = require('express');
+var ccjs = require('ccjs');
 
 require('too-late');
 
-var app = connect();
+var app = express();
 
-app.use(connect.logger())
-    .use(connect.query())
-    .use(ccjs({
-        root: path.join(__dirname, 'js'),
-        coffee: true
-    }))
-    .use(connect.static(__dirname));
+var options = {
+    root: path.join(__dirname, 'js'),
+    coffee: true
+};
+
+app.use(ccjs.middleware(options));
+
+app.use(ccjs.hotswap(options));
+
+app.use(express.static(__dirname));
+
 
 port = process.env.PORT || 8000;
 app.listen(port);
