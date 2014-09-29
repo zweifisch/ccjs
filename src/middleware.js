@@ -29,7 +29,7 @@ var middleware = function(opts) {
                 return res.end();
             } catch(e) {
                 log.error(e);
-                res.write(';console.error(' + JSON.stringify(e) + ');');
+                res.write(';console.error(' + JSON.stringify(e.toString()) + ');');
                 return res.end();
             }
         }
