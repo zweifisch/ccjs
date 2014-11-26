@@ -13,8 +13,6 @@ var options = {
 
 app.use(ccjs.middleware(options));
 
-app.use(ccjs.hotswap(options));
-
 app.use(express.static(__dirname));
 
 

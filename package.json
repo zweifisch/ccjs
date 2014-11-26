@@ -1,6 +1,6 @@
 {
   "name": "ccjs",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "client side common js                                                                                                                                                 ",
   "main": "index.js",
   "scripts": {
@@ -9,12 +9,10 @@
   "author": "zf",
   "license": "MIT",
   "dependencies": {
-    "chokidar": "^0.8.3",
     "debug": "^1.0.4"
   },
   "devDependencies": {
     "coffee-script": "^1.7.1",
-    "debug": "^1.0.4",
     "jquery": "^2.1.0",
     "lodash": "^2.4.1",
     "page": "^1.3.7",
