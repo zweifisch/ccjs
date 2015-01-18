@@ -1,6 +1,6 @@
 var path = require('path');
 var express = require('express');
-var ccjs = require('ccjs');
+var ccjs = require('../index');
 
 require('too-late');
 
