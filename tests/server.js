@@ -23,4 +23,4 @@ console.log("listening on port "+ port +", use PORT=<port> to change default por
 
 setTimeout(function() {
     process.exit();
-}, 5000);
+}, 10000);

@@ -4,7 +4,7 @@
   "description": "client side common js                                                                                                                                                 ",
   "main": "index.js",
   "scripts": {
-    "test": "node_modules/mocha-phantomjs/bin/mocha-phantomjs http://localhost:${PORT:-8000}"
+    "test": "node_modules/mocha-phantomjs/bin/mocha-phantomjs http://${HOST:-localhost}:${PORT:-8000}"
   },
   "author": "zf",
   "license": "MIT",
