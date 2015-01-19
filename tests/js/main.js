@@ -53,9 +53,4 @@ describe('require', function() {
 
 });
 
-if (window.mochaPhantomJS)
-{
-    mochaPhantomJS.run();
-} else {
-    mocha.run();
-}
+mochaPhantomJS.run();
